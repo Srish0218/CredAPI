@@ -17,13 +17,22 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install dependencies
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip  # Cache pip packages
+          key: python-dependencies-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            python-dependencies-${{ runner.os }}-
+
+      - name: Install dependencies (only if not cached)
         run: |
-          pip install -r requirements.txt  # Install required packages
+          pip install --upgrade pip
+          pip install -r requirements.txt  
 
       - name: Run Python script in a loop
         run: |
           for i in {1..12}; do  # Runs 12 times (every 5 seconds for 1 minute)
-            python n8ntest.py  # Change to your script name
+            python scheduleBRCP.py  # Change to your script name
             sleep 5  # Wait for 5 seconds before running again
           done
