@@ -17,10 +17,6 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt  # Install required packages
-
       - name: Run Python script in a loop
         run: |
           for i in {1..12}; do  # Runs 12 times (every 5 seconds for 1 min)
