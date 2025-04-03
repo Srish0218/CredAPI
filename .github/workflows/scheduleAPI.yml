@@ -1,12 +1,10 @@
-name: Deploy FastAPI App
+name: Run Python Script
 
 on:
-  schedule:
-    - cron: "10 */1 * * *"  # Runs every 1 hour 10 minutes
-  workflow_dispatch:  # Allows manual trigger
+  workflow_dispatch:  # Allows manual trigger from GitHub Actions UI
 
 jobs:
-  run-fastapi:
+  run-script:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -17,25 +15,10 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install ODBC Driver 17 for SQL Server
-        run: |
-          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc > /dev/null
-          echo "deb [arch=amd64] https://packages.microsoft.com/ubuntu/20.04/prod focal main" | sudo tee /etc/apt/sources.list.d/mssql-release.list
-          sudo apt-get update
-          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql17 unixodbc-dev
-
-      - name: Cache Python dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: python-dependencies-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            python-dependencies-${{ runner.os }}-
-
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt  
 
-      - name: Run FastAPI app
-        run: uvicorn scheduleBRCP:app --host 0.0.0.0 --port 8000
+      - name: Run Python script
+        run: python scheduleBRCP.py
