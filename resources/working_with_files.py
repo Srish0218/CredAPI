@@ -1,3 +1,7 @@
+from datetime import datetime, timedelta
+
+import pytz
+
 from ZulipMessenger import reportError
 
 
@@ -23,7 +27,7 @@ REQUIRED_COLUMNS_BRCP = [
     "Probable_Reason_for_Escalation_Evidence", "Agent_Handling_Capability",
     "Wanted_to_connect_with_supervisor", "de_escalate", "Supervisor_call_connected",
     "call_back_arranged_from_supervisor", "supervisor_evidence", "Denied_for_Supervisor_call",
-    "denied_evidence", "Today_Date"
+    "denied_evidence", "Today_Date", "uploaded_id"
 ]
 
 
@@ -111,3 +115,11 @@ def categorize_missing_columns(missing_cols):
         categories.append("Supervisor")
 
     return categories
+
+def get_time():
+    """Get the current IST time formatted as '01_April_2025_558PM'."""
+    ist = pytz.timezone('Asia/Kolkata')
+    current_time = datetime.now(ist) - timedelta(hours=1)
+    return current_time.strftime("%d_%B_%Y_%I%M%p")
+
+

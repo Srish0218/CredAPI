@@ -1,27 +1,43 @@
-from ZulipMessenger import reportStatus, reportError
-from fetchData import is_latest_uid_present, INPUT_DATABASE
-from main import fetch_api_result, generate_output_brcp
+import time
+import schedule
+import subprocess
+import sys
 
 
-def get_brcp_result():
-    """Fetch result from external API and process data using Gemini."""
-    status, uid = is_latest_uid_present(INPUT_DATABASE)
+# Function to ensure required packages are installed
+def install_requirements():
+    try:
+        import zulip  # Check if 'zulip' is installed
+    except ModuleNotFoundError:
+        print("Installing missing dependencies...")
+        subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"], check=True)
+        print("Dependencies installed successfully.")
 
-    if status:
-        reportStatus(f"{uid} UID is already present in tPrimaryInfo.")
-        print(f"{uid} UID is already present in tPrimaryInfo.")
-    else:
-        reportStatus(f"{uid} UID is NOT present in tPrimaryInfo.")
-        print(f"{uid} UID is NOT present in tPrimaryInfo.")
-    # uid = get_latest_uid()
-    if uid:
-        transmon_response = fetch_api_result(uid)
-        gemini_response = generate_output_brcp(uid)
-        status = {"TransmonResponse": transmon_response, "GeminiResponse": gemini_response}
-        reportStatus(status)
-    else:
-        status = {"status": "Fetching latest Upload ID Failed", "message": "Upload Id not found"}
-        reportError(status)
-    return status
 
-get_brcp_result()
+# Function to run the Python script
+def run_script():
+    print("\n=== Running Script at:", time.strftime('%Y-%m-%d %H:%M:%S'), "===")
+
+    try:
+        subprocess.run([sys.executable, "getBrcpOutput.py"], check=True)  # Runs getBrcpOutput.py
+        print("Execution Successful")
+    except subprocess.CalledProcessError as e:
+        print(f"Error running script: {e}")
+
+
+# Install requirements once before scheduling
+install_requirements()
+
+# Run the script once before scheduling starts
+run_script()
+
+# Schedule the script to run every 10 minutes
+schedule.every(60).seconds.do(run_script)
+
+# Run scheduler indefinitely
+if __name__ == "__main__":
+    print("Scheduler is running... (Executing getBrcpOutput.py every 10 minutes)")
+
+    while True:
+        schedule.run_pending()
+        time.sleep(30)  # Check every 30 seconds

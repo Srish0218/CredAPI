@@ -1,4 +1,3 @@
-import time
 from datetime import datetime
 
 import pandas as pd
@@ -8,7 +7,7 @@ from spacy_langdetect import LanguageDetector
 
 from ZulipMessenger import reportError
 from fetchData import upload_softskill_result_on_database
-from parameters import retry_classification, updating_RudeSarcasm_result, classify_rude_sarcastic, \
+from parameters import updating_RudeSarcasm_result, classify_rude_sarcastic, \
     process_transcripts_escalation, classify_supervisor, classify_langSwitch, classifyApologyEmpathy, \
     classifyUnethicalSolicitation, classifyReassurance, classifyChatClosing, classifyChatOpening, \
     create_final_DSAT_results, classify_DSAT, classifyVoiceOfCustomer, classifyOpeningLang, processing_timely_closing, \
@@ -17,64 +16,15 @@ from parameters import retry_classification, updating_RudeSarcasm_result, classi
     categorize_hold_status
 from resources.RefiningResults import merge_all_dataframes, main_processing_pipeline
 from resources.working_with_files import merge_dataframes, validate_SOFTSKILL_dataframe, \
-    REQUIRED_COLUMNS_SOFTSKILL, validateDataframes, validate_brcp_dataframe
+    REQUIRED_COLUMNS_SOFTSKILL, validate_brcp_dataframe
 
 
-def analyse_data_using_gemini_for_brcp(df):
-    max_retries = 5
-    retry_delay = 5
+def analyse_data_using_gemini_for_brcp(df, uid, nowtime):
     # Step 1: Sarcasm & Rudeness Classification
     rude_columns = ['Sarcasm_rude_behaviour', 'Sarcasm_rude_behaviour_evidence']
     RudeSarcastic_res_df = process_classification(classify_rude_sarcastic, df, rude_columns, "Rude and Sarcastic")
     # Apply result updates
     RudeSarcastic_res_df = RudeSarcastic_res_df.apply(updating_RudeSarcasm_result, axis=1)
-
-    # for attempt in range(1, max_retries + 1):
-    #     print(f"Attempt {attempt}: Processing Sarcasm & Rudeness...")
-    #
-    #     # Perform classification
-    #     RudeSarcastic_res_df, sarcasm_error_ids = classify_rude_sarcastic(df)
-    #
-    #     # If some request IDs failed, retry only for those
-    #     if sarcasm_error_ids:
-    #         print(f"⚠️ Retrying classification for failed request IDs...")
-    #         RudeSarcastic_res_df = retry_classification(df, RudeSarcastic_res_df, classify_rude_sarcastic,
-    #                                                     sarcasm_error_ids, rude_columns)
-    #
-    #     # If classification completely fails, retry
-    #     if RudeSarcastic_res_df is None:
-    #         print(f"⚠️ Attempt {attempt} failed: No valid output. Retrying entire DataFrame...")
-    #         if attempt == max_retries:
-    #             reportError("❌ Max retries reached for Sarcasm classification. No valid output received.")
-    #             return None
-    #         time.sleep(retry_delay)
-    #         continue
-    #
-    #     # Apply result updates
-    #     RudeSarcastic_res_df = RudeSarcastic_res_df.apply(updating_RudeSarcasm_result, axis=1)
-    #
-    #     # Validate Output
-    #     is_valid, missing_cols, extra_cols = validateDataframes(RudeSarcastic_res_df, rude_columns + ["request_id"])
-    #
-    #     # Drop extra columns immediately
-    #     if extra_cols:
-    #         print(f"⚠️ Dropping extra columns: {extra_cols}")
-    #         RudeSarcastic_res_df = RudeSarcastic_res_df.drop(columns=extra_cols, errors="ignore")
-    #
-    #     # If output is valid, break the retry loop
-    #     if is_valid:
-    #         print("✅ Sarcasm processing complete")
-    #         break
-    #
-    #     print(f"⚠️ Attempt {attempt} failed: Missing columns [{missing_cols}] detected. Retrying entire DataFrame...")
-    #
-    #     # If max retries are reached, log error and return None
-    #     if attempt == max_retries:
-    #         reportError(f"❌ Max retries reached for Sarcasm classification. Issues:\n"
-    #                     f"- Missing Columns: {missing_cols}")
-    #         return None
-    #
-    #     time.sleep(retry_delay)
 
     # Step 2: Escalation Processing
     escalation_columns = [
@@ -82,51 +32,6 @@ def analyse_data_using_gemini_for_brcp(df):
         'Probable_Reason_for_Escalation_Evidence', 'Agent_Handling_Capability'
     ]
     escalation_res_df = process_classification(process_transcripts_escalation, df, escalation_columns, "Escalation")
-
-
-    # for attempt in range(1, max_retries + 1):
-    #     print(f"Attempt {attempt}: Processing Escalation...")
-    #
-    #     # Perform classification
-    #     escalation_res_df, escalation_error_ids = process_transcripts_escalation(df)
-    #
-    #     # Retry only failed request IDs if any
-    #     if escalation_error_ids:
-    #         print(f"⚠️ Retrying classification for failed request IDs...")
-    #         escalation_res_df = retry_classification(df, escalation_res_df, process_transcripts_escalation,
-    #                                                  escalation_error_ids, escalation_columns)
-    #
-    #     # If classification completely fails, retry the entire DataFrame
-    #     if escalation_res_df is None:
-    #         print(f"⚠️ Attempt {attempt} failed: No valid output. Retrying entire DataFrame...")
-    #         if attempt == max_retries:
-    #             reportError("❌ Max retries reached for Escalation classification. No valid output received.")
-    #             return None
-    #         time.sleep(retry_delay)
-    #         continue
-    #
-    #     # Validate Output
-    #     is_valid, missing_cols, extra_cols = validateDataframes(escalation_res_df, escalation_columns + ["request_id"])
-    #
-    #     # Drop extra columns immediately
-    #     if extra_cols:
-    #         print(f"⚠️ Dropping extra columns: {extra_cols}")
-    #         escalation_res_df = escalation_res_df.drop(columns=extra_cols, errors="ignore")
-    #
-    #     # If output is valid, stop retrying
-    #     if is_valid:
-    #         print("✅ Escalation processing complete")
-    #         break
-    #
-    #     print(f"⚠️ Attempt {attempt} failed: Missing columns detected. Retrying entire DataFrame...")
-    #
-    #     # If max retries are reached, log error and return None
-    #     if attempt == max_retries:
-    #         reportError(f"❌ Max retries reached for Escalation classification. Issues:\n"
-    #                     f"- Missing Columns: {missing_cols}")
-    #         return None
-    #
-    #     time.sleep(retry_delay)
 
     # Step 3: Supervisor Classification
     supervisor_columns = [
@@ -136,49 +41,6 @@ def analyse_data_using_gemini_for_brcp(df):
     ]
     supervisor_res_df = process_classification(classify_supervisor, df, supervisor_columns, "Supervisor Connect")
 
-    # for attempt in range(1, max_retries + 1):
-    #     print(f"Attempt {attempt}: Processing Supervisor Handling...")
-    #
-    #     # Perform classification
-    #     supervisor_res_df, supervisor_error_ids = classify_supervisor(df)
-    #
-    #     # Retry only failed request IDs if any
-    #     if supervisor_error_ids:
-    #         print(f"⚠️ Retrying classification for failed request IDs...")
-    #         supervisor_res_df = retry_classification(df, supervisor_res_df, classify_supervisor,
-    #                                                  supervisor_error_ids, supervisor_columns)
-    #
-    #     # If classification completely fails, retry the entire DataFrame
-    #     if supervisor_res_df is None:
-    #         print(f"⚠️ Attempt {attempt} failed: No valid output. Retrying entire DataFrame...")
-    #         if attempt == max_retries:
-    #             reportError("❌ Max retries reached for Supervisor classification. No valid output received.")
-    #             return None
-    #         time.sleep(retry_delay)
-    #         continue
-    #
-    #     # Validate Output
-    #     is_valid, missing_cols, extra_cols = validateDataframes(supervisor_res_df, supervisor_columns + ["request_id"])
-    #
-    #     # Drop extra columns immediately
-    #     if extra_cols:
-    #         print(f"⚠️ Dropping extra columns: {extra_cols}")
-    #         supervisor_res_df = supervisor_res_df.drop(columns=extra_cols, errors="ignore")
-    #
-    #     # If output is valid, stop retrying
-    #     if is_valid:
-    #         print("✅ Supervisor processing complete")
-    #         break
-    #
-    #     print(f"⚠️ Attempt {attempt} failed: Missing columns detected. Retrying entire DataFrame...")
-    #
-    #     # If max retries are reached, log error and return None
-    #     if attempt == max_retries:
-    #         reportError(f"❌ Max retries reached for Supervisor classification. Issues:\n"
-    #                     f"- Missing Columns: {missing_cols}")
-    #         return None
-    #
-    #     time.sleep(retry_delay)
 
     CRED_FINAL_OUTPUT = df[['conversation_id', 'request_id']]
     for df, name in zip([RudeSarcastic_res_df, escalation_res_df, supervisor_res_df],
@@ -202,18 +64,24 @@ def analyse_data_using_gemini_for_brcp(df):
                 index, 'Sarcasm_rude_behaviour_evidence'] = "The agent remained polite and professional."
 
     CRED_FINAL_OUTPUT.fillna("N/A", inplace=True)
+    CRED_FINAL_OUTPUT.to_excel(f"CRED_FINAL_OUTPUT_{nowtime}.xlsx")
+    try:
+        CRED_FINAL_OUTPUT['uploaded_id'] = str(uid)
+    except Exception as e:
+        print(e)
     is_valid, missing_cols, extra_cols = validate_brcp_dataframe(CRED_FINAL_OUTPUT)
 
     if is_valid:
         return CRED_FINAL_OUTPUT
     else:
         if missing_cols:
-            body = "❌ The Output Data is missing the following columns:\n\n" + missing_cols
+            body = "❌ The Output Data is missing the following columns:\n\n" + ", ".join(missing_cols)
             reportError(body)
             return None
 
         if extra_cols:
-            body = "⚠️ The Output Data contains extra columns not in the required list:\n\n" + extra_cols + "\nExtra Columns are dropped."
+            body = "⚠️ The Output Data contains extra columns not in the required list:\n\n" + ", ".join(
+                extra_cols) + "\nExtra Columns are dropped."
             CRED_FINAL_OUTPUT = CRED_FINAL_OUTPUT.drop(columns=extra_cols, errors="ignore")
             reportError(body)
             return CRED_FINAL_OUTPUT

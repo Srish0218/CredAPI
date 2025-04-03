@@ -32,9 +32,9 @@ def send_zulip_message(content: str):
     return response
 
 
-def reportSuccessMsgBRCP(uid: str):
+def reportSuccessMsgBRCP(uid: str,created_on: str):
     """Reports success for BRCP upload."""
-    content = f"Cred Brcp data for {uid} uploaded successfully at {time.strftime('%Y-%m-%d %H:%M:%S')}"
+    content = f"Cred Brcp data for {uid}_{created_on} uploaded successfully at {time.strftime('%Y-%m-%d %H:%M:%S')}"
     return send_zulip_message(content)
 
 

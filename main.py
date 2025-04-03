@@ -10,12 +10,12 @@ from ZulipMessenger import reportTranscriptGenerated, reportError, reportStatus
 from analyseData import analyse_data_using_gemini_for_brcp, analyse_data_for_soft_skill
 from fetchData import fetch_data_from_database, upload_cred_result_on_database, fetch_data_softskill, get_latest_uid, \
     is_latest_uid_present, INPUT_DATABASE
+from resources.working_with_files import get_time
 
 app = FastAPI()
 
 
 def fetch_api_result(uid: str, max_retries=100, retry_delay=5):
-    reportStatus(f"Generating transcripts for {uid}")
     """Fetch API result from external service with retry mechanism."""
     url = f"https://tmc.wyzmindz.com/CredASR/api/CredASR/FetchResultFromVocab?uploaded_id={uid}"
     headers = {"accept": "*/*"}
@@ -54,26 +54,27 @@ def fetch_api_result(uid: str, max_retries=100, retry_delay=5):
     return error
 
 
-def generate_output_brcp(uid):
+def generate_output_brcp(uid, created_on):
     """Fetch, analyze, and upload data with enhanced error handling."""
     try:
         # Fetch data from the database
         df = fetch_data_from_database(uid)
+        time = get_time()
         if df is None or df.empty:
             error_msg = "Failed to fetch data from the database or DataFrame is empty."
             reportError(error_msg)
             return {"status": "Failed", "message": error_msg}
 
         # Analyze data using Gemini model
-        final_df = analyse_data_using_gemini_for_brcp(df)
-        final_df.to_excel(f"CRED_BRCP_{uid}.xlsx")
-        if not isinstance(final_df, pd.DataFrame) or final_df.empty or final_df is None:
+        final_df = analyse_data_using_gemini_for_brcp(df, uid, time)
+        final_df.to_excel(f"CRED_FINAL_OUTPUT_{time}.xlsx")
+        if final_df.empty or final_df is None:
             error_msg = "Data analysis failed. The output DataFrame is either missing or incorrect."
             reportError(error_msg)
             return {"status": "Failed", "message": error_msg}
 
         # Upload processed data to the database
-        msg = upload_cred_result_on_database(final_df, uid)
+        msg = upload_cred_result_on_database(final_df, uid, created_on)
         if "successfully" in msg.lower():
             return {"status": "Success", "message": msg}
         else:
@@ -95,23 +96,25 @@ def home():
 @app.get("/brcp")
 def get_brcp_result():
     """Fetch result from external API and process data using Gemini."""
-    status, uid = is_latest_uid_present(INPUT_DATABASE)
+    status, uid, created_on = is_latest_uid_present(INPUT_DATABASE)
 
     if status:
-        reportStatus(f"{uid} UID is already present in tPrimaryInfo.")
+        # reportStatus(f"{uid} UID is already present in tPrimaryInfo.")
         print(f"{uid} UID is already present in tPrimaryInfo.")
+        return {"status": "Success", "message": "NO new ID found"}
     else:
-        reportStatus(f"{uid} UID is NOT present in tPrimaryInfo.")
+        reportStatus(f"{uid} UID is NOT present in tPrimaryInfo. Generating transcripts for {uid}")
         print(f"{uid} UID is NOT present in tPrimaryInfo.")
-    # uid = get_latest_uid()
+    # uid = "ETL_73059"
     if uid:
         transmon_response = fetch_api_result(uid)
-        gemini_response = generate_output_brcp(uid)
+        gemini_response = generate_output_brcp(uid, created_on)
         status = {"TransmonResponse": transmon_response, "GeminiResponse": gemini_response}
         reportStatus(status)
     else:
         status = {"status": "Fetching latest Upload ID Failed", "message": "Upload Id not found"}
         reportError(status)
+
     return status
 
 

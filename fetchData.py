@@ -15,7 +15,7 @@ DRIVER = os.getenv("DB_DRIVER", "{ODBC Driver 17 for SQL Server}")
 INPUT_DATABASE = os.getenv("INPUT_DATABASE")
 OUTPUT_DATABASE = os.getenv("OUTPUT_DATABASE")
 
-max_retries = 5
+max_retries = 20
 retry_delay = 5  # Seconds
 
 def get_connection(DATABASE):
@@ -30,7 +30,7 @@ def get_connection(DATABASE):
             time.sleep(retry_delay * attempt)
     return None
 
-def upload_cred_result_on_database(final_df, uid):
+def upload_cred_result_on_database(final_df, uid, created_on):
     """Insert DataFrame into the database with retry mechanism."""
       # seconds
 
@@ -48,8 +48,8 @@ def upload_cred_result_on_database(final_df, uid):
         Probable_Reason_for_Escalation_Evidence, Agent_Handling_Capability,
         Wanted_to_connect_with_supervisor, de_escalate, Supervisor_call_connected,
         call_back_arranged_from_supervisor, supervisor_evidence, Denied_for_Supervisor_call,
-        denied_evidence, Today_Date
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        denied_evidence, Today_Date, Uploaded_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
 
     try:
@@ -58,7 +58,7 @@ def upload_cred_result_on_database(final_df, uid):
                 with conn.cursor() as cursor:
                     cursor.executemany(insert_query, data_tuples)
                 conn.commit()
-                reportSuccessMsgBRCP(uid)
+                reportSuccessMsgBRCP(uid, created_on)
                 return "Data inserted successfully!"
             except Exception as e:
                 conn.rollback()  # Prevents partial inserts
@@ -97,7 +97,8 @@ def fetch_data_from_database(uid):
             if df.empty:
                 reportError("No data found for the given UID.")
                 return None
-            reportStatus(f"Data Fetching Success with columns: {list(df.columns)}")
+            reportStatus(f"Data Fetching Success: {df.shape[0]} conversation IDs, columns: {list(df.columns)}")
+
             return df
 
         except Exception as e:
@@ -212,29 +213,32 @@ def fetch_data_softskill(date):
 
     return None, None, None, "Data fetching failed after retries!"
 
+
 def get_latest_uid(database):
-    """Fetch the latest uploaded_id from Conversation_ID_List with retries."""
+    """Fetch the latest uploaded_id and created_on timestamp from Conversation_ID_List with retries."""
     for attempt in range(max_retries):
         conn = get_connection(database)
         if conn is None:
-            return None  # Return None if connection fails
+            return None, None  # Return None for both values if connection fails
 
         try:
             query = """
-                SELECT uploaded_id FROM Conversation_ID_List 
+                SELECT uploaded_id, created_on FROM Conversation_ID_List 
                 WHERE id = (SELECT MAX(id) FROM Conversation_ID_List);
             """
             cursor = conn.cursor()
             cursor.execute(query)
             row = cursor.fetchone()
-            return row[0] if row else None
+            return (row[0], row[1]) if row else (None, None)  # Return both values
         except Exception as e:
-            reportError(f"[ERROR] get_latest_uid failed (Attempt {attempt+1}/3): {e}")
+            reportError(f"[ERROR] get_latest_uid failed (Attempt {attempt + 1}/3): {e}")
             time.sleep(retry_delay)
         finally:
             if conn:
                 conn.close()
-    return None  # Return None if all attempts fail
+
+    return None, None  # Return None for both values if all attempts fail
+
 
 def get_all_primaryinfo_uids(database):
     """Fetch all distinct uploaded_id values from tPrimaryInfo."""
@@ -257,9 +261,9 @@ def get_all_primaryinfo_uids(database):
 
 def is_latest_uid_present(database):
     """Check if the latest UID from Conversation_ID_List is already in tPrimaryInfo."""
-    latest_uid = get_latest_uid(database)
+    latest_uid, created_on = get_latest_uid(database)
     if latest_uid is None:
         return False, latest_uid
 
     primaryinfo_uids = get_all_primaryinfo_uids(database)
-    return latest_uid in primaryinfo_uids, latest_uid
+    return latest_uid in primaryinfo_uids, latest_uid, created_on

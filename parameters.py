@@ -51,11 +51,6 @@ def classify_rude_sarcastic(df: pd.DataFrame, request_ids=None):
     return pd.DataFrame(results), errors
 
 
-
-
-
-
-
 def process_transcripts_escalation(df: pd.DataFrame, request_ids=None):
     results, errors = [], []
     request_id_list = set(request_ids if request_ids else df["request_id"].tolist())
@@ -161,7 +156,8 @@ def retry_classification(main_df, parameter_df, classify_func, error_ids, column
             for row in rerun_res_df.to_dict('records'):
                 request_id = row['request_id']
                 if request_id in parameter_df['request_id'].values:
-                    parameter_df.loc[parameter_df['request_id'] == request_id, columns] = row[columns].values
+                    row_series = pd.Series(row)  # Convert row to Pandas Series
+                    parameter_df.loc[parameter_df['request_id'] == request_id, columns] = row_series[columns].values
 
         error_ids = new_error_ids  # Update remaining error IDs
 
@@ -1447,7 +1443,6 @@ def process_TimelyOpening(dataframe):
     return first_rows[['request_id', 'Delayed call opening', 'Delayed call opening evidence']]
 
 
-
 def process_classification(classification_func, df, expected_columns, classification_name):
     max_retries = 5
     retry_delay = 5
@@ -1469,7 +1464,8 @@ def process_classification(classification_func, df, expected_columns, classifica
         if res_df is None:
             print(f"⚠️ Attempt {attempt} failed: No valid output. Retrying entire DataFrame...")
             if attempt == max_retries:
-                reportError(f"❌ Max retries reached for {classification_name} classification. No valid output received.")
+                reportError(
+                    f"❌ Max retries reached for {classification_name} classification. No valid output received.")
                 return None
             time.sleep(retry_delay)
             continue
@@ -1496,6 +1492,7 @@ def process_classification(classification_func, df, expected_columns, classifica
             return None
 
         time.sleep(retry_delay)
+
 
 def process_hold_data(transcriptChat_df):
     hold_df = process_Hold_Parameter(transcriptChat_df)
